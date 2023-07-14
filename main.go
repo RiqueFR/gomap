@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -35,9 +36,9 @@ func create_array_from_range(start int, end int) []int {
 	return array
 }
 
-func get_ports_list_from_args() []int {
+func get_ports_list_from_args(pos int) []int {
 	var portsArray []int
-	var portsStringArray []string = strings.Split(os.Args[2], ",")
+	var portsStringArray []string = strings.Split(os.Args[pos], ",")
 	portsArray = make([]int, len(portsStringArray))
 	for i, p := range portsStringArray {
 		portsArray[i], _ = strconv.Atoi(p)
@@ -50,9 +51,33 @@ func print_usage_and_exit() {
 	os.Exit(1)
 }
 
-func main() {
-	var numArgs = len(os.Args)
+func getArgPositionIfExist(args []string, option string) (int, error) {
+	for i, val := range args {
+		if val == option {
+			return i, nil
+		}
+	}
+	return -1, errors.New("option not found")
+}
 
+func verifyNumberOfArgs(args []string) {
+	var numArgs = len(args)
+	var expectedNumArgs int = 2
+	var err error
+	_, err = getArgPositionIfExist(os.Args, "-t")
+	if err == nil {
+		expectedNumArgs += 2
+	}
+	_, err = getArgPositionIfExist(os.Args, "-p")
+	if err == nil {
+		expectedNumArgs += 2
+	}
+	if numArgs != expectedNumArgs {
+		print_usage_and_exit()
+	}
+}
+
+func main() {
 	var host string
 
 	//TODO 	verify num threads if num ports is less than num threads,
@@ -66,25 +91,33 @@ func main() {
 
 	var portsArray []int
 
-	if numArgs > 1 {
-		if os.Args[1] == "-p" {
-			if numArgs != 4 {
-				print_usage_and_exit()
-			}
-			lastArg = 3
-			portsArray = get_ports_list_from_args()
-			host = os.Args[lastArg]
-		} else {
-			host = os.Args[lastArg]
-			portsArray = create_array_from_range(1, maxNumPorts + 1)
+	verifyNumberOfArgs(os.Args) // exit program if wrong number of args
+
+	threadArgPosition, err := getArgPositionIfExist(os.Args, "-t")
+	if err == nil {
+		lastArg += 2
+		numThreads, _ = strconv.Atoi(os.Args[threadArgPosition+1])
+		if numThreads <= 0 {
+			fmt.Println("Number of threads less than or equal to 0")
+			os.Exit(2)
 		}
-	} else {
-		print_usage_and_exit()
 	}
+	portsArgPosition, err := getArgPositionIfExist(os.Args, "-p")
+	if err == nil {
+		lastArg += 2
+		portsArray = get_ports_list_from_args(portsArgPosition+1)
+	} else {
+		portsArray = create_array_from_range(1, maxNumPorts + 1)
+	}
+
+	host = os.Args[lastArg]
 
 	var wg sync.WaitGroup
 
 	var numPorts int = len(portsArray)
+	if numPorts < numThreads {
+		numThreads = numPorts
+	}
 	var portsPerThread int = numPorts/numThreads
 
 	channel := make(chan int, numPorts)
