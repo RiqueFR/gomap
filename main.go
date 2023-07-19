@@ -9,12 +9,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 func print_open_port(channel chan int, host string, port int) {
 	var hostWithPort string
 	hostWithPort = net.JoinHostPort(host, strconv.Itoa(port))
-	_, err := net.DialTimeout("tcp", hostWithPort, 1 * 1000 * 1000 * 1000) // timeout 1s
+	// TODO make timeout configurable, on/off, duration
+	_, err := net.DialTimeout("tcp", hostWithPort, 100 * time.Millisecond) // timeout 1ms
 	if err == nil {
 		channel <- port
 	}
@@ -80,10 +82,6 @@ func verifyNumberOfArgs(args []string) {
 func main() {
 	var host string
 
-	//TODO 	verify num threads if num ports is less than num threads,
-	// 		check if it is negative or 0
-	//TODO 	check timeout, if server do not exist or is not reacheable
-	// 		it takes too long
 	var numThreads int = 1
 	var maxNumPorts int = 65535 // 1 - 65535
 
